@@ -1,0 +1,5 @@
+{:paths ["src"]
+ :tasks
+ {score {:doc "Audit HTML pages: bb score <file-or-dir>... [--weights f.edn] [--skip a,b] [--min N] [--edn]"
+         :task (apply (requiring-resolve 'design-quality.cli/-main)
+                      (cons "score" *command-line-args*))}}}
