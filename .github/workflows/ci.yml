@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: clojure -M:test (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - name: Setup Clojure CLI
+        uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          cli: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cache m2 / gitlibs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2
+            ~/.gitlibs
+          key: ${{ runner.os }}-jdk${{ matrix.java }}-clj-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-jdk${{ matrix.java }}-clj-
+      - name: Run tests
+        run: clojure -M:test
+      - name: Lint
+        run: clojure -M:lint
+
+  cli:
+    name: CLI smoke (bb + nbb, identical output + gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup babashka
+        uses: turtlequeue/setup-babashka@v1.7.0
+        with:
+          babashka-version: 1.12.206
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: bb and nbb produce the same report
+        run: |
+          bb score test/fixtures/ > bb-out.txt
+          npx --yes nbb -m design-quality.cli score test/fixtures/ > nbb-out.txt
+          diff bb-out.txt nbb-out.txt
+      - name: exit-code gate (bad fixture < --min 99 must fail)
+        run: |
+          if bb score test/fixtures/bad.html --min 99 > /dev/null; then
+            echo "expected exit 1" && exit 1
+          fi
+          bb score test/fixtures/good.html --min 99 > /dev/null
+          if npx --yes nbb -m design-quality.cli score test/fixtures/bad.html --min 99 > /dev/null; then
+            echo "expected exit 1" && exit 1
+          fi
