@@ -104,38 +104,48 @@
   "One judge result -> ledger event maps (one per axis), same :eval/* shape as
   design-quality-ledger.edn plus :eval/persona :eval/page. `scores` is
   {axis-id {:score n :note s}}. seq0 is the first :eval/seq to use; events get
-  seq0, seq0+1, ..."
-  [{:keys [run-id at judge persona-id page-id seq0]} scores]
+  seq0, seq0+1, ...
+
+  `:theme` (optional, e.g. :light/:dark) adds an :eval/theme key when given --
+  follow-up 1 of ADR-2607141550 (light/dark scored as distinct capture
+  conditions, not folded together). Omitted entirely when nil, so events built
+  without a theme keep the exact pre-existing shape (append-only ledger:
+  historical lines never had this key, and never need to)."
+  [{:keys [run-id at judge persona-id page-id seq0 theme]} scores]
   (into []
         (map-indexed
          (fn [i {:keys [id]}]
-           (let [{:keys [score note]} (get scores id)]
-             {:eval/layer :persona-visual
-              :eval/persona persona-id
-              :eval/page page-id
-              :eval/axis (keyword "axis" (clojure.core/name id))
-              :eval/score (double score)
-              :eval/judge judge
-              :eval/run-id run-id
-              :eval/at at
-              :eval/seq (+ seq0 i)
-              :eval/note note})))
-        axes))
+           (let [{:keys [score note]} (get scores id)
+                 base {:eval/layer :persona-visual
+                       :eval/persona persona-id
+                       :eval/page page-id
+                       :eval/axis (keyword "axis" (clojure.core/name id))
+                       :eval/score (double score)
+                       :eval/judge judge
+                       :eval/run-id run-id
+                       :eval/at at
+                       :eval/seq (+ seq0 i)
+                       :eval/note note}]
+             (if (some? theme)
+               (assoc base :eval/theme theme)
+               base)))
+         axes)))
 
 (defn feedback-event
   "Free-text feedback items -> one ledger event. `items` is a vector of strings
-  ordered by impact."
-  [{:keys [run-id at judge persona-id page-id seq0]} items]
-  {:eval/layer :persona-visual
-   :eval/persona persona-id
-   :eval/page page-id
-   :eval/axis :axis/feedback
-   :eval/score 0.0
-   :eval/judge judge
-   :eval/run-id run-id
-   :eval/at at
-   :eval/seq seq0
-   :eval/note (str/join " | " items)})
+  ordered by impact. `:theme` -- see score-events."
+  [{:keys [run-id at judge persona-id page-id seq0 theme]} items]
+  (cond-> {:eval/layer :persona-visual
+           :eval/persona persona-id
+           :eval/page page-id
+           :eval/axis :axis/feedback
+           :eval/score 0.0
+           :eval/judge judge
+           :eval/run-id run-id
+           :eval/at at
+           :eval/seq seq0
+           :eval/note (str/join " | " items)}
+    (some? theme) (assoc :eval/theme theme)))
 
 (defn mean-by-axis
   "events (:persona-visual score events) -> {axis-id {:mean m :n n :stdev s}}.
