@@ -49,3 +49,56 @@
     (is (= 4.0 (double (get-in stats [:axis/trust :mean]))))
     (is (= 2 (get-in stats [:axis/trust :n])))
     (is (= 1.0 (double (get-in stats [:axis/trust :stdev]))))))
+
+(deftest three-judge-mean-and-stdev
+  (testing "mean-by-axis is already judge-count-agnostic -- 3 independent
+            judges aggregate the same way as 2, closing follow-up 1 of
+            ADR-2607141550 (persona panel の3-judge化) at the mechanism level"
+    (let [mk (fn [judge score]
+               (persona/score-events {:run-id "r" :at "t" :judge judge
+                                      :persona-id :p :page-id :g :seq0 0}
+                                     (into {} (map (fn [{:keys [id]}] [id {:score score :note ""}])
+                                                   persona/axes))))
+          stats (persona/mean-by-axis (concat (mk "j1" 3) (mk "j2" 4) (mk "j3" 5)))]
+      (is (= 3 (get-in stats [:axis/trust :n])))
+      (is (= 4.0 (double (get-in stats [:axis/trust :mean]))))
+      (is (< 0.0 (get-in stats [:axis/trust :stdev]))
+          "3 disagreeing judges produce a nonzero stdev, not silently hidden"))))
+
+(deftest score-events-theme-tagging
+  (testing "omitting :theme keeps the exact pre-existing event shape -- no
+            :eval/theme key at all, so historical (pre-theme) ledger lines
+            and new theme-less callers are indistinguishable"
+    (let [evs (persona/score-events {:run-id "r" :at "t" :judge "j1"
+                                     :persona-id :p :page-id :g :seq0 0}
+                                    (into {} (map (fn [{:keys [id]}] [id {:score 3 :note ""}])
+                                                  persona/axes)))]
+      (is (every? #(not (contains? % :eval/theme)) evs))))
+  (testing ":theme, when given, is threaded onto every score event and the
+            feedback event -- follow-up 1's light/dark distinct scoring"
+    (let [ctx {:run-id "r" :at "t" :judge "j1" :persona-id :p :page-id :g
+               :seq0 0 :theme :dark}
+          scores (into {} (map (fn [{:keys [id]}] [id {:score 3 :note ""}]) persona/axes))
+          score-evs (persona/score-events ctx scores)
+          fb-ev (persona/feedback-event (assoc ctx :seq0 6) ["x"])]
+      (is (every? #(= :dark (:eval/theme %)) score-evs))
+      (is (= :dark (:eval/theme fb-ev)))))
+  (testing "light and dark runs for the same page/persona aggregate
+            separately when the caller filters by :eval/theme before calling
+            mean-by-axis (mean-by-axis itself only ever groups by axis, same
+            as it already does for page/persona -- callers scope the input)"
+    (let [mk-theme (fn [theme score]
+                     (persona/score-events {:run-id "r" :at "t" :judge "j1"
+                                            :persona-id :p :page-id :g :seq0 0
+                                            :theme theme}
+                                           (into {} (map (fn [{:keys [id]}] [id {:score score :note ""}])
+                                                         persona/axes))))
+          light-evs (mk-theme :light 5)
+          dark-evs (mk-theme :dark 2)
+          light-stats (persona/mean-by-axis light-evs)
+          dark-stats (persona/mean-by-axis dark-evs)]
+      (is (= 5.0 (double (get-in light-stats [:axis/trust :mean]))))
+      (is (= 2.0 (double (get-in dark-stats [:axis/trust :mean]))))
+      (is (not= (get-in light-stats [:axis/trust :mean])
+                (get-in dark-stats [:axis/trust :mean]))
+          "themes are NOT silently averaged together"))))
