@@ -63,7 +63,8 @@
 ;; --- argument parsing ----------------------------------------------------------
 
 (defn parse-args
-  "[args] → {:paths [...] :weights-file s :skip #{kw} :min n :format :report|:edn}
+  "[args] → {:paths [...] :weights-file s :skip #{kw} :min n :format :report|:edn
+              :extra-axes? bool}
    or {:error msg}."
   [args]
   (loop [args args acc {:paths [] :format :report}]
@@ -81,6 +82,7 @@
                         (recur (nnext args) (assoc acc :min n))
                         {:error (str "--min needs a number, got: " v)})
                       {:error "--min needs a number argument"})
+        "--extra-axes" (recur (next args) (assoc acc :extra-axes? true))
         "--edn"     (recur (next args) (assoc acc :format :edn))
         "--report"  (recur (next args) (assoc acc :format :report))
         (if (str/starts-with? a "--")
@@ -103,9 +105,34 @@
 
 ;; --- report rendering ------------------------------------------------------------
 
+(defn- coverage-line
+  "Which axes this run actually scored, and which it did not.
+
+  A score is not a certificate for the axes that were never applied. The CLI
+  scores `default-axes` (10) and leaves `extra-axes` (input-zoom, contrast)
+  out unless asked, so a page can hold a raw colour with poor contrast and
+  still print 100.00 — measured 2026-08-18 by three separate migrations, each
+  of which read the 100 as saying more than it does. The number does not
+  change; the report now says what it covers."
+  [{:keys [extra-axes? skip]}]
+  (let [scored (cond-> (mapv (comp name :id) audit/default-axes)
+                 extra-axes? (into (mapv (comp name :id) audit/extra-axes)))
+        scored (if (seq skip)
+                 (remove (set (map name skip)) scored)
+                 scored)
+        omitted (cond-> []
+                  (not extra-axes?) (into (mapv (comp name :id) audit/extra-axes))
+                  (seq skip) (into (map name skip)))]
+    (str "axes scored: " (count scored) " (" (str/join ", " scored) ")"
+         (when (seq omitted)
+           (str "\nNOT scored: " (str/join ", " omitted)
+                (when-not extra-axes? " — pass --extra-axes to include the optional ones")
+                "\nA pass says nothing about an axis that was not applied.")))))
+
 (defn render-report
   "Human-readable report for an `audit` result → string."
-  [{:keys [overall pages findings]} min-score]
+  ([result min-score] (render-report result min-score {}))
+  ([{:keys [overall pages findings]} min-score coverage]
   (let [page-lines
         (mapcat (fn [[name {:keys [overall axes]}]]
                   (cons (str "  " (fmt2 overall) "  " name)
@@ -130,9 +157,10 @@
               (concat [(str "design-quality audit — " (count pages) " page(s)") ""]
                       page-lines
                       ["" (str "aggregate: " (fmt2 overall)) ""
+                       (coverage-line coverage) ""
                        "findings (headroom-first):"]
                       finding-lines
-                      gate-lines))))
+                      gate-lines)))))
 
 ;; --- entry ------------------------------------------------------------------------
 
@@ -144,7 +172,7 @@
     (if (not= cmd "score")
       (do (println "usage: score <file-or-dir>... [--weights <edn-file>] [--skip axis1,axis2] [--min <score>] [--edn|--report]")
           {:exit (if (nil? cmd) 0 1)})
-      (let [{:keys [error paths weights-file skip min format]} (parse-args rest-args)]
+      (let [{:keys [error paths weights-file skip min format extra-axes?]} (parse-args rest-args)]
         (cond
           error (do (println (str "error: " error)) {:exit 1})
           (empty? paths) (do (println "error: no files or directories given") {:exit 1})
@@ -152,12 +180,13 @@
           (let [pages (collect-pages paths)
                 opts (cond-> {}
                        weights-file (assoc :weights (edn/read-string (slurp-file weights-file)))
-                       skip (assoc :skip skip))
+                       skip (assoc :skip skip)
+                       extra-axes? (assoc :extra-axes audit/extra-axes))
                 result (audit/audit pages opts)
                 gated? (and min (< (:overall result) min))]
             (if (= format :edn)
               (prn result)
-              (println (render-report result min)))
+              (println (render-report result min {:extra-axes? extra-axes? :skip skip})))
             {:exit (if gated? 1 0) :result result}))))))
 
 (defn -main [& args]
