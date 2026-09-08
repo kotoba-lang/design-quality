@@ -3,7 +3,7 @@
    findings for a broken sample, a perfect sample scoring 100, the
    override/skip/extra-axes mechanics, aggregate math — plus a JVM CLI smoke."
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [design-quality.audit :as audit]
             #?(:clj [design-quality.cli :as cli])
             #?(:clj [clojure.java.io :as io])))
