@@ -38,7 +38,7 @@
    :tap-targets / :focus-visible / :input-zoom (no literal `<button`/`<input`
    in the static file). Audit the rendered/built page, and concatenate any
    `<link>`-ed stylesheets into the source string before scoring."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (defn- has? [s re] (boolean (re-find re s)))
 

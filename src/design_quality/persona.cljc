@@ -22,7 +22,7 @@
     track records, certifications, testimonials) must NOT be applied by Evolve.
 
   Pure cljc, no I/O — capture/judging/appending are the runner's job."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 ;; --- axes --------------------------------------------------------------------
 

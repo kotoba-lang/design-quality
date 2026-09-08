@@ -16,7 +16,7 @@
 
    The engine (design-quality.audit) stays pure; all IO lives here behind
    reader conditionals (nbb: node fs, bb/clj: clojure.java.io)."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [design-quality.audit :as audit]
             #?(:clj [clojure.edn :as edn]
                :cljs [cljs.reader :as edn])
