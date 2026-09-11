@@ -66,9 +66,9 @@ don't need to be 1.0.
 ## CLI (nbb / babashka; JVM optional)
 
 ```bash
-bb score page.html dist/            # bb.edn task
+kbb -M:score page.html dist/            # bb.edn task
 bb  -m design-quality.cli score dist/
-nbb -m design-quality.cli score dist/
+kbb --backend sci -m design-quality.cli score dist/
 
 # options
 ... score dist/ --skip contrast,semantics \
@@ -91,8 +91,8 @@ ADR-2607132300 addendum 3) — audit the built/rendered page, and concatenate
 ## Dev
 
 ```bash
-clojure -M:test    # cognitect test-runner
-clojure -M:lint    # clj-kondo, --fail-level error
+kbb -M:test    # cognitect test-runner
+kbb -M:lint    # clj-kondo, --fail-level error
 ```
 
 ## Maturity
@@ -100,7 +100,7 @@ clojure -M:lint    # clj-kondo, --fail-level error
 | | |
 |---|---|
 | Role | design-quality fitness function (deterministic arm) |
-| Tests | `clojure -M:test` (12 tests, 161 assertions) + CI bb/nbb CLI smoke |
+| Tests | `kbb -M:test` (12 tests, 161 assertions) + CI bb/nbb CLI smoke |
 | Runtimes | nbb, babashka, ClojureScript, JVM |
 | Third-party runtime deps | none (clojure.string only) |
 

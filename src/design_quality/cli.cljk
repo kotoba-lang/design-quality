@@ -10,7 +10,7 @@
 
    Runs on nbb (Node) and babashka (JVM optional):
 
-     nbb -m design-quality.cli score test/fixtures/
+     kbb --backend sci -m design-quality.cli score test/fixtures/
      bb  -m design-quality.cli score test/fixtures/*.html
      bb  score test/fixtures/*.html            ;; bb.edn task
 
