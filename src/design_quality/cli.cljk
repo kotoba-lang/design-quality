@@ -18,7 +18,7 @@
    reader conditionals (nbb: node fs, bb/clj: clojure.java.io)."
   (:require [kotoba.lang.text :as str]
             [design-quality.audit :as audit]
-            #?(:clj [clojure.edn :as edn]
+            #?(:clj [kotoba.lang.edn :as edn]
                :cljs [cljs.reader :as edn])
             #?(:clj [clojure.java.io :as io])
             #?(:cljs ["fs" :as fs])))
